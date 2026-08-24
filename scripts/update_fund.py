@@ -49,8 +49,10 @@ def get_fund_data():
     )
 
     # 提取 Data_netWorthTrend
+    # 东方财富返回的是 JavaScript，而不是标准 JSON。
+    # 因此只提取变量赋值右侧的数组。
     match = re.search(
-        r'var\s+Data_netWorthTrend\s*=\s*(\[\[.*?\]\]);',
+        r'var\s+Data_netWorthTrend\s*=\s*(.*?);',
         text,
         re.S,
     )
@@ -60,7 +62,17 @@ def get_fund_data():
             "Cannot find Data_netWorthTrend in response"
         )
 
-    raw_data = json.loads(match.group(1))
+    raw_text = match.group(1).strip()
+
+    try:
+        raw_data = json.loads(raw_text)
+    except json.JSONDecodeError as e:
+        print("Failed to parse Data_netWorthTrend")
+        print("First 500 characters:")
+        print(raw_text[:500])
+        raise RuntimeError(
+            f"Invalid Data_netWorthTrend JSON: {e}"
+        )
 
     print(f"Raw NAV records: {len(raw_data)}")
 
