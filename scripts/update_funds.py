@@ -26,18 +26,29 @@ HEADERS = {
 BEIJING_TZ = timezone(timedelta(hours=8))
 
 
+def now_beijing():
+    return datetime.now(BEIJING_TZ)
+
+
 def now_iso():
-    return datetime.now(BEIJING_TZ).isoformat()
+    return now_beijing().isoformat()
 
 
 def load_config():
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+
+    with open(
+        CONFIG_FILE,
+        "r",
+        encoding="utf-8",
+    ) as f:
         config = json.load(f)
 
     funds = config.get("funds", [])
 
     if not funds:
-        raise RuntimeError("No funds found in config/funds.json")
+        raise RuntimeError(
+            "No funds found in config/funds.json"
+        )
 
     return funds
 
@@ -59,8 +70,13 @@ def get_fund_data(code, configured_name):
 
     text = response.text
 
-    print(f"HTTP status: {response.status_code}")
-    print(f"Response length: {len(text)}")
+    print(
+        f"HTTP status: {response.status_code}"
+    )
+
+    print(
+        f"Response length: {len(text)}"
+    )
 
     # ------------------------------------------------------------
     # 基金名称
@@ -88,6 +104,7 @@ def get_fund_data(code, configured_name):
     )
 
     if not match:
+
         raise RuntimeError(
             "Cannot find Data_netWorthTrend"
         )
@@ -95,13 +112,20 @@ def get_fund_data(code, configured_name):
     raw_text = match.group(1).strip()
 
     try:
-        raw_data = json.loads(raw_text)
+
+        raw_data = json.loads(
+            raw_text
+        )
+
     except json.JSONDecodeError as e:
+
         raise RuntimeError(
             f"Invalid Data_netWorthTrend JSON: {e}"
         )
 
-    print(f"Raw NAV records: {len(raw_data)}")
+    print(
+        f"Raw NAV records: {len(raw_data)}"
+    )
 
     result = []
 
@@ -121,21 +145,40 @@ def get_fund_data(code, configured_name):
             continue
 
         try:
+
             timestamp = float(timestamp)
             nav = float(nav)
-        except (ValueError, TypeError):
+
+        except (
+            ValueError,
+            TypeError,
+        ):
+
             continue
 
-        # 基本数据质量检查
+        # NAV 必须大于 0
         if nav <= 0:
             continue
 
-        dt = datetime.fromtimestamp(
-            timestamp / 1000,
-            tz=timezone.utc,
-        ).astimezone(BEIJING_TZ)
+        try:
 
-        date = dt.strftime("%Y-%m-%d")
+            dt = datetime.fromtimestamp(
+                timestamp / 1000,
+                tz=timezone.utc,
+            ).astimezone(
+                BEIJING_TZ
+            )
+
+        except (
+            ValueError,
+            OverflowError,
+        ):
+
+            continue
+
+        date = dt.strftime(
+            "%Y-%m-%d"
+        )
 
         result.append(
             {
@@ -145,6 +188,7 @@ def get_fund_data(code, configured_name):
         )
 
     if not result:
+
         raise RuntimeError(
             "No valid NAV records found"
         )
@@ -156,7 +200,10 @@ def get_fund_data(code, configured_name):
     unique = {}
 
     for item in result:
-        unique[item["date"]] = item["close"]
+
+        unique[item["date"]] = item[
+            "close"
+        ]
 
     result = [
         {
@@ -175,7 +222,100 @@ def get_fund_data(code, configured_name):
     return fund_name, result
 
 
-def save_fund(code, fund_name, data):
+def is_weekend(date_obj):
+
+    return date_obj.weekday() >= 5
+
+
+def business_days_since(date_str):
+
+    try:
+
+        latest_date = datetime.strptime(
+            date_str,
+            "%Y-%m-%d",
+        ).date()
+
+    except ValueError:
+
+        return None
+
+    today = now_beijing().date()
+
+    if latest_date > today:
+
+        return None
+
+    count = 0
+
+    current = latest_date
+
+    while current < today:
+
+        current += timedelta(days=1)
+
+        if not is_weekend(
+            current
+        ):
+            count += 1
+
+    return count
+
+
+def check_freshness(latest_date):
+
+    business_days = (
+        business_days_since(
+            latest_date
+        )
+    )
+
+    if business_days is None:
+
+        return {
+            "status": "error",
+            "daysSinceUpdate": None,
+            "message": "Invalid NAV date",
+        }
+
+    # ------------------------------------------------------------
+    # 判断规则
+    #
+    # 0-2 个工作日：正常
+    # 3-4 个工作日：可能延迟
+    # >=5 个工作日：stale
+    #
+    # 这样可以避免周末、节假日造成误报。
+    # ------------------------------------------------------------
+
+    if business_days <= 2:
+
+        return {
+            "status": "ok",
+            "daysSinceUpdate": business_days,
+            "message": "NAV is fresh",
+        }
+
+    if business_days <= 4:
+
+        return {
+            "status": "warning",
+            "daysSinceUpdate": business_days,
+            "message": "NAV may be delayed",
+        }
+
+    return {
+        "status": "stale",
+        "daysSinceUpdate": business_days,
+        "message": "NAV has not been updated recently",
+    }
+
+
+def save_fund(
+    code,
+    fund_name,
+    data,
+):
 
     os.makedirs(
         OUTPUT_DIR,
@@ -187,34 +327,38 @@ def save_fund(code, fund_name, data):
         f"{code}.json",
     )
 
+    old_output = None
+
     # ------------------------------------------------------------
     # 读取旧数据
     # ------------------------------------------------------------
 
-    old_output = None
-
-    if os.path.exists(output_file):
+    if os.path.exists(
+        output_file
+    ):
 
         try:
+
             with open(
                 output_file,
                 "r",
                 encoding="utf-8",
             ) as f:
+
                 old_output = json.load(f)
 
         except Exception:
+
             print(
                 f"Warning: cannot read existing "
                 f"{output_file}"
             )
 
-    # ------------------------------------------------------------
-    # 判断基金净值是否真正发生变化
-    # ------------------------------------------------------------
-
     old_data = (
-        old_output.get("data", [])
+        old_output.get(
+            "data",
+            [],
+        )
         if old_output
         else []
     )
@@ -231,14 +375,14 @@ def save_fund(code, fund_name, data):
         else None
     )
 
+    # ------------------------------------------------------------
+    # 判断是否真正产生了新数据
+    # ------------------------------------------------------------
+
     data_changed = (
         old_latest != new_latest
         or len(old_data) != len(data)
     )
-
-    # ------------------------------------------------------------
-    # 如果净值完全没有变化
-    # ------------------------------------------------------------
 
     if (
         old_output is not None
@@ -252,16 +396,14 @@ def save_fund(code, fund_name, data):
         return False
 
     # ------------------------------------------------------------
-    # 创建新数据
+    # 创建新 JSON
     # ------------------------------------------------------------
-
-    updated = now_iso()
 
     output = {
         "symbol": code,
         "name": fund_name,
         "currency": "CNY",
-        "updated": updated,
+        "updated": now_iso(),
         "data": data,
     }
 
@@ -309,6 +451,7 @@ def process_fund(fund):
 
         return {
             "code": code,
+            "name": configured_name,
             "status": "disabled",
         }
 
@@ -327,14 +470,41 @@ def process_fund(fund):
 
         latest = data[0]
 
+        freshness = check_freshness(
+            latest["date"]
+        )
+
+        # --------------------------------------------------------
+        # 如果数据本身正常，但 freshness 有问题
+        # --------------------------------------------------------
+
+        if freshness["status"] != "ok":
+
+            print(
+                f"WARNING {code}: "
+                f"{freshness['message']}"
+            )
+
         return {
             "code": code,
             "name": fund_name,
-            "status": "ok",
-            "latestDate": latest["date"],
-            "latestNAV": latest["close"],
+            "status": freshness[
+                "status"
+            ],
+            "latestDate": latest[
+                "date"
+            ],
+            "latestNAV": latest[
+                "close"
+            ],
             "records": len(data),
+            "daysSinceUpdate": freshness[
+                "daysSinceUpdate"
+            ],
             "changed": changed,
+            "message": freshness[
+                "message"
+            ],
         }
 
     except Exception as e:
@@ -387,7 +557,8 @@ def main():
     funds = load_config()
 
     print(
-        f"Found {len(funds)} funds in configuration."
+        f"Found {len(funds)} "
+        f"funds in configuration."
     )
 
     results = []
@@ -402,10 +573,12 @@ def main():
             result
         )
 
-        # 防止请求过于频繁
+        # 请求间隔
         time.sleep(2)
 
-    save_status(results)
+    save_status(
+        results
+    )
 
     # ------------------------------------------------------------
     # 汇总
@@ -415,6 +588,18 @@ def main():
         1
         for r in results
         if r["status"] == "ok"
+    )
+
+    warning = sum(
+        1
+        for r in results
+        if r["status"] == "warning"
+    )
+
+    stale = sum(
+        1
+        for r in results
+        if r["status"] == "stale"
     )
 
     failed = sum(
@@ -434,18 +619,15 @@ def main():
     print(
         f"Finished. "
         f"Success: {success}, "
+        f"Warning: {warning}, "
+        f"Stale: {stale}, "
         f"Failed: {failed}, "
         f"Disabled: {disabled}"
     )
 
-    # ------------------------------------------------------------
-    # 注意：
-    # 即使某只基金失败，也不让整个 Workflow 失败
-    # ------------------------------------------------------------
-
     print(
-        "Workflow will continue even if "
-        "individual funds fail."
+        "Individual fund failures "
+        "will not stop the workflow."
     )
 
 
