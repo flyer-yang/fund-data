@@ -9,6 +9,9 @@ import requests
 
 CONFIG_FILE = "config/funds.json"
 OUTPUT_DIR = "funds"
+STATUS_FILE = "status.json"
+
+BASE_URL = "https://fund.eastmoney.com/pingzhongdata/{}.js"
 
 HEADERS = {
     "User-Agent": (
@@ -21,6 +24,10 @@ HEADERS = {
 }
 
 BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def now_iso():
+    return datetime.now(BEIJING_TZ).isoformat()
 
 
 def load_config():
@@ -36,10 +43,8 @@ def load_config():
 
 
 def get_fund_data(code, configured_name):
-    url = (
-        f"https://fund.eastmoney.com/"
-        f"pingzhongdata/{code}.js"
-    )
+
+    url = BASE_URL.format(code)
 
     print("=" * 80)
     print(f"Fetching {code}...")
@@ -57,9 +62,9 @@ def get_fund_data(code, configured_name):
     print(f"HTTP status: {response.status_code}")
     print(f"Response length: {len(text)}")
 
-    # ------------------------------------------------------------------
-    # Fund name
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------
+    # 基金名称
+    # ------------------------------------------------------------
 
     name_match = re.search(
         r'var\s+fS_name\s*=\s*"([^"]*)"',
@@ -72,9 +77,9 @@ def get_fund_data(code, configured_name):
         else configured_name
     )
 
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------
     # Data_netWorthTrend
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------
 
     match = re.search(
         r'var\s+Data_netWorthTrend\s*=\s*(.*?);',
@@ -84,7 +89,7 @@ def get_fund_data(code, configured_name):
 
     if not match:
         raise RuntimeError(
-            f"{code}: Cannot find Data_netWorthTrend"
+            "Cannot find Data_netWorthTrend"
         )
 
     raw_text = match.group(1).strip()
@@ -92,19 +97,17 @@ def get_fund_data(code, configured_name):
     try:
         raw_data = json.loads(raw_text)
     except json.JSONDecodeError as e:
-        print("Failed to parse Data_netWorthTrend")
-        print(raw_text[:500])
         raise RuntimeError(
-            f"{code}: Invalid Data_netWorthTrend JSON: {e}"
+            f"Invalid Data_netWorthTrend JSON: {e}"
         )
 
     print(f"Raw NAV records: {len(raw_data)}")
 
     result = []
 
-    # ------------------------------------------------------------------
-    # Parse NAV records
-    # ------------------------------------------------------------------
+    # ------------------------------------------------------------
+    # 解析净值
+    # ------------------------------------------------------------
 
     for item in raw_data:
 
@@ -123,6 +126,10 @@ def get_fund_data(code, configured_name):
         except (ValueError, TypeError):
             continue
 
+        # 基本数据质量检查
+        if nav <= 0:
+            continue
+
         dt = datetime.fromtimestamp(
             timestamp / 1000,
             tz=timezone.utc,
@@ -139,10 +146,13 @@ def get_fund_data(code, configured_name):
 
     if not result:
         raise RuntimeError(
-            f"{code}: No valid NAV records found"
+            "No valid NAV records found"
         )
 
-    # Remove duplicate dates
+    # ------------------------------------------------------------
+    # 去除重复日期
+    # ------------------------------------------------------------
+
     unique = {}
 
     for item in result:
@@ -156,7 +166,7 @@ def get_fund_data(code, configured_name):
         for date, close in unique.items()
     ]
 
-    # Newest first
+    # 最新日期在前
     result.sort(
         key=lambda x: x["date"],
         reverse=True,
@@ -177,9 +187,7 @@ def save_fund(code, fund_name, data):
         f"{code}.json",
     )
 
-    updated = datetime.now(
-        BEIJING_TZ
-    ).isoformat()
+    updated = now_iso()
 
     output = {
         "symbol": code,
@@ -189,30 +197,144 @@ def save_fund(code, fund_name, data):
         "data": data,
     }
 
+    # ------------------------------------------------------------
+    # 只有内容发生变化时才写入
+    # ------------------------------------------------------------
+
+    old_content = None
+
+    if os.path.exists(output_file):
+
+        with open(
+            output_file,
+            "r",
+            encoding="utf-8",
+        ) as f:
+            old_content = f.read()
+
+    new_content = json.dumps(
+        output,
+        ensure_ascii=False,
+        indent=2,
+    )
+
+    if old_content == new_content:
+
+        print(
+            f"No content change: {output_file}"
+        )
+
+        return False
+
     with open(
         output_file,
         "w",
         encoding="utf-8",
     ) as f:
+        f.write(new_content)
+
+    print(
+        f"Updated {output_file}"
+    )
+
+    return True
+
+
+def process_fund(fund):
+
+    code = str(
+        fund["code"]
+    ).strip()
+
+    configured_name = fund.get(
+        "name",
+        "",
+    )
+
+    enabled = fund.get(
+        "enabled",
+        True,
+    )
+
+    if not enabled:
+
+        print(
+            f"Skipping disabled fund: {code}"
+        )
+
+        return {
+            "code": code,
+            "status": "disabled",
+        }
+
+    try:
+
+        fund_name, data = get_fund_data(
+            code,
+            configured_name,
+        )
+
+        changed = save_fund(
+            code,
+            fund_name,
+            data,
+        )
+
+        latest = data[0]
+
+        return {
+            "code": code,
+            "name": fund_name,
+            "status": "ok",
+            "latestDate": latest["date"],
+            "latestNAV": latest["close"],
+            "records": len(data),
+            "changed": changed,
+        }
+
+    except Exception as e:
+
+        print(
+            f"ERROR {code}: {e}"
+        )
+
+        return {
+            "code": code,
+            "name": configured_name,
+            "status": "error",
+            "error": str(e),
+        }
+
+
+def save_status(results):
+
+    status = {
+        "updated": now_iso(),
+        "funds": {},
+    }
+
+    for result in results:
+
+        code = result["code"]
+
+        status["funds"][code] = result
+
+    with open(
+        STATUS_FILE,
+        "w",
+        encoding="utf-8",
+    ) as f:
+
         json.dump(
-            output,
+            status,
             f,
             ensure_ascii=False,
             indent=2,
         )
 
     print(
-        f"Saved {len(data)} records → "
-        f"{output_file}"
+        f"Saved {STATUS_FILE}"
     )
-
-    print("Latest NAV:")
-
-    for item in data[:3]:
-        print(
-            f"  {item['date']} "
-            f"{item['close']:.4f}"
-        )
 
 
 def main():
@@ -223,56 +345,63 @@ def main():
         f"Found {len(funds)} funds in configuration."
     )
 
-    success = 0
-    failed = 0
+    results = []
 
     for fund in funds:
 
-        code = str(fund["code"]).strip()
-        name = fund.get("name", "")
+        result = process_fund(
+            fund
+        )
 
-        if not fund.get("enabled", True):
-            print(f"Skipping disabled fund: {code}")
-            continue
+        results.append(
+            result
+        )
 
-        try:
-
-            fund_name, data = get_fund_data(
-                code,
-                name,
-            )
-
-            save_fund(
-                code,
-                fund_name,
-                data,
-            )
-
-            success += 1
-
-        except Exception as e:
-
-            failed += 1
-
-            print(
-                f"ERROR: {code}: {e}"
-            )
-
-        # Avoid requesting too quickly
+        # 防止请求过于频繁
         time.sleep(2)
+
+    save_status(results)
+
+    # ------------------------------------------------------------
+    # 汇总
+    # ------------------------------------------------------------
+
+    success = sum(
+        1
+        for r in results
+        if r["status"] == "ok"
+    )
+
+    failed = sum(
+        1
+        for r in results
+        if r["status"] == "error"
+    )
+
+    disabled = sum(
+        1
+        for r in results
+        if r["status"] == "disabled"
+    )
 
     print("=" * 80)
 
     print(
         f"Finished. "
         f"Success: {success}, "
-        f"Failed: {failed}"
+        f"Failed: {failed}, "
+        f"Disabled: {disabled}"
     )
 
-    if failed > 0:
-        raise RuntimeError(
-            f"{failed} fund(s) failed."
-        )
+    # ------------------------------------------------------------
+    # 注意：
+    # 即使某只基金失败，也不让整个 Workflow 失败
+    # ------------------------------------------------------------
+
+    print(
+        "Workflow will continue even if "
+        "individual funds fail."
+    )
 
 
 if __name__ == "__main__":
