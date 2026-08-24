@@ -14,20 +14,27 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          ref: main
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
           pip install requests
 
       - name: Update fund NAV
         run: |
           python scripts/update_fund.py
+
+      - name: Show generated file
+        run: |
+          head -40 funds/007194.json
 
       - name: Commit updated NAV
         run: |
