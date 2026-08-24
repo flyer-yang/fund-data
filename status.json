@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-24T15:01:57.825005+08:00",
+  "updated": "2026-08-24T15:12:20.486188+08:00",
   "funds": {
     "007194": {
       "code": "007194",
@@ -8,13 +8,7 @@
       "latestDate": "2026-08-21",
       "latestNAV": 1.2518,
       "records": 1677,
-      "changed": true
-    },
-    "999999": {
-      "code": "999999",
-      "name": "测试基金",
-      "status": "error",
-      "error": "Cannot find Data_netWorthTrend"
+      "changed": false
     }
   }
 }
