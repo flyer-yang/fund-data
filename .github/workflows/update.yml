@@ -28,9 +28,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: Update fund NAV
+      - name: Test data sources
         run: |
-          python scripts/update_fund.py
+          python scripts/test_sources.py
 
       - name: Show generated file
         run: |
