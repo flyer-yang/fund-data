@@ -3,7 +3,7 @@ name: Update Fund NAV
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "48 13 * * *"
 
 permissions:
   contents: write
