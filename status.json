@@ -1,0 +1,14 @@
+{
+  "updated": "2026-08-24T14:57:41.736497+08:00",
+  "funds": {
+    "007194": {
+      "code": "007194",
+      "name": "长城短债A",
+      "status": "ok",
+      "latestDate": "2026-08-21",
+      "latestNAV": 1.2518,
+      "records": 1677,
+      "changed": true
+    }
+  }
+}
