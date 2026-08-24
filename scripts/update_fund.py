@@ -78,14 +78,17 @@ def get_fund_data():
 
     result = []
 
-    # Data_netWorthTrend 的结构通常为：
-    # [timestamp, unit NAV, accumulated NAV, ...]
+    # 东方财富 Data_netWorthTrend 当前通常返回对象：
+    # {"x": 时间戳, "y": 单位净值, ...}
     for item in raw_data:
-        if not isinstance(item, list) or len(item) < 2:
+        if not isinstance(item, dict):
             continue
 
-        timestamp = item[0]
-        nav = item[1]
+        timestamp = item.get("x")
+        nav = item.get("y")
+
+        if timestamp is None or nav is None:
+            continue
 
         try:
             timestamp = float(timestamp)
