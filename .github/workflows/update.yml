@@ -30,18 +30,18 @@ jobs:
 
       - name: Update fund NAV
         run: |
-          python scripts/update_fund.py
+          python scripts/update_funds.py
 
       - name: Commit updated NAV
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add funds/007194.json
+          git add funds/
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Update 007194 NAV"
+            git commit -m "Update fund NAV"
             git push
           fi
