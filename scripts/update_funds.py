@@ -187,6 +187,74 @@ def save_fund(code, fund_name, data):
         f"{code}.json",
     )
 
+    # ------------------------------------------------------------
+    # 读取旧数据
+    # ------------------------------------------------------------
+
+    old_output = None
+
+    if os.path.exists(output_file):
+
+        try:
+            with open(
+                output_file,
+                "r",
+                encoding="utf-8",
+            ) as f:
+                old_output = json.load(f)
+
+        except Exception:
+            print(
+                f"Warning: cannot read existing "
+                f"{output_file}"
+            )
+
+    # ------------------------------------------------------------
+    # 判断基金净值是否真正发生变化
+    # ------------------------------------------------------------
+
+    old_data = (
+        old_output.get("data", [])
+        if old_output
+        else []
+    )
+
+    old_latest = (
+        old_data[0]
+        if old_data
+        else None
+    )
+
+    new_latest = (
+        data[0]
+        if data
+        else None
+    )
+
+    data_changed = (
+        old_latest != new_latest
+        or len(old_data) != len(data)
+    )
+
+    # ------------------------------------------------------------
+    # 如果净值完全没有变化
+    # ------------------------------------------------------------
+
+    if (
+        old_output is not None
+        and not data_changed
+    ):
+
+        print(
+            f"No NAV change: {code}"
+        )
+
+        return False
+
+    # ------------------------------------------------------------
+    # 创建新数据
+    # ------------------------------------------------------------
+
     updated = now_iso()
 
     output = {
@@ -197,41 +265,18 @@ def save_fund(code, fund_name, data):
         "data": data,
     }
 
-    # ------------------------------------------------------------
-    # 只有内容发生变化时才写入
-    # ------------------------------------------------------------
-
-    old_content = None
-
-    if os.path.exists(output_file):
-
-        with open(
-            output_file,
-            "r",
-            encoding="utf-8",
-        ) as f:
-            old_content = f.read()
-
-    new_content = json.dumps(
-        output,
-        ensure_ascii=False,
-        indent=2,
-    )
-
-    if old_content == new_content:
-
-        print(
-            f"No content change: {output_file}"
-        )
-
-        return False
-
     with open(
         output_file,
         "w",
         encoding="utf-8",
     ) as f:
-        f.write(new_content)
+
+        json.dump(
+            output,
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )
 
     print(
         f"Updated {output_file}"
