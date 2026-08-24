@@ -5,5 +5,10 @@
       "name": "长城短债A",
       "enabled": true
     }
+    {
+      "code": "999999",
+      "name": "测试基金",
+      "enabled": true
+    }
   ]
 }
