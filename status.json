@@ -1,15 +1,15 @@
 {
-  "updated": "2026-08-24T15:20:20.673194+08:00",
+  "updated": "2026-08-24T21:40:46.325912+08:00",
   "funds": {
     "007194": {
       "code": "007194",
       "name": "长城短债A",
       "status": "ok",
-      "latestDate": "2026-08-21",
-      "latestNAV": 1.2518,
-      "records": 1677,
-      "daysSinceUpdate": 1,
-      "changed": false,
+      "latestDate": "2026-08-24",
+      "latestNAV": 1.2521,
+      "records": 1678,
+      "daysSinceUpdate": 0,
+      "changed": true,
       "message": "NAV is fresh"
     }
   }
