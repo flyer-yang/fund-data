@@ -4,6 +4,11 @@
       "code": "007194",
       "name": "长城短债A",
       "enabled": true
+    },
+    {
+      "code": "163406",
+      "name": "兴全合润混合",
+      "enabled": true
     }
   ]
 }
