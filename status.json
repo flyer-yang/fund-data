@@ -1,13 +1,13 @@
 {
-  "updated": "2026-09-15T02:49:45.866239+08:00",
+  "updated": "2026-09-16T01:44:53.193901+08:00",
   "funds": {
     "007194": {
       "code": "007194",
       "name": "长城短债A",
       "status": "ok",
-      "latestDate": "2026-09-14",
-      "latestNAV": 1.2543,
-      "records": 1693,
+      "latestDate": "2026-09-15",
+      "latestNAV": 1.2545,
+      "records": 1694,
       "daysSinceUpdate": 1,
       "changed": true,
       "message": "NAV is fresh"
@@ -16,9 +16,9 @@
       "code": "163406",
       "name": "兴全合润混合A",
       "status": "ok",
-      "latestDate": "2026-09-14",
-      "latestNAV": 2.2111,
-      "records": 3982,
+      "latestDate": "2026-09-15",
+      "latestNAV": 2.2112,
+      "records": 3983,
       "daysSinceUpdate": 1,
       "changed": true,
       "message": "NAV is fresh"
