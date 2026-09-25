@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-25T01:55:22.030469+08:00",
+  "updated": "2026-09-26T02:02:23.182846+08:00",
   "funds": {
     "007194": {
       "code": "007194",
@@ -9,7 +9,7 @@
       "latestNAV": 1.2562,
       "records": 1701,
       "daysSinceUpdate": 1,
-      "changed": true,
+      "changed": false,
       "message": "NAV is fresh"
     },
     "163406": {
@@ -20,7 +20,7 @@
       "latestNAV": 2.2654,
       "records": 3990,
       "daysSinceUpdate": 1,
-      "changed": true,
+      "changed": false,
       "message": "NAV is fresh"
     }
   }
